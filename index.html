@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <title>File Store Bot</title>
+    <style>
+        body {
+            font-family: system-ui;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: var(--tg-theme-bg-color);
+            color: var(--tg-theme-text-color);
+        }
+        .container { text-align: center; padding: 20px; }
+        button {
+            background: var(--tg-theme-button-color);
+            color: var(--tg-theme-button-text-color);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            margin: 10px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .hidden { display: none; }
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .status { margin-top: 20px; font-size: 18px; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="loadingView">
+            <div class="loader"></div>
+            <div class="status">Loading...</div>
+        </div>
+        <div id="adView" class="hidden">
+            <button id="watchAdBtn">🎁 Watch Ad & Get File</button>
+            <div id="adStatus" class="status"></div>
+        </div>
+    </div>
+
+    <script src='//libtl.com/sdk.js' data-zone='10823122' data-sdk='show_10823122'></script>
+    <script>
+        let tg = window.Telegram.WebApp;
+        tg.expand();
+        
+        // Get the file code from the link that opened this app
+        let fileCode = tg.initDataUnsafe.start_param || 'unknown';
+        console.log("Mini App Loaded. File Code:", fileCode);
+
+        // Function to send data back to the bot
+        function sendToBot(status) {
+            let data = { status: status, file_code: fileCode };
+            try {
+                console.log("Sending to bot:", data);
+                tg.sendData(JSON.stringify(data));
+                console.log("Data sent successfully.");
+                return true;
+            } catch (e) {
+                console.error("Failed to send data:", e);
+                return false;
+            }
+        }
+
+        // --- Your Monetag Ad Logic ---
+        const watchAdBtn = document.getElementById('watchAdBtn');
+        const loadingView = document.getElementById('loadingView');
+        const adView = document.getElementById('adView');
+        const adStatusDiv = document.getElementById('adStatus');
+
+        watchAdBtn.addEventListener('click', () => {
+            console.log("Watch Ad button clicked.");
+            adView.classList.add('hidden');
+            loadingView.classList.remove('hidden');
+            adStatusDiv.innerHTML = '';
+
+            if (typeof show_10823122 === 'undefined') {
+                console.error("Monetag SDK (show_10823122) not loaded!");
+                adStatusDiv.innerHTML = 'Ad service error. Please try again.';
+                adStatusDiv.classList.add('error');
+                loadingView.classList.add('hidden');
+                adView.classList.remove('hidden');
+                return;
+            }
+
+            // Call the Monetag ad
+            show_10823122()
+                .then(() => {
+                    console.log("Monetag Ad Completed Successfully.");
+                    adStatusDiv.innerHTML = 'Ad completed! Sending your file...';
+                    adStatusDiv.classList.add('success');
+                    
+                    // THIS IS THE CRITICAL PART: Tell the bot the ad is done
+                    let sent = sendToBot('ad_completed');
+                    if (sent) {
+                        adStatusDiv.innerHTML = '✅ Success! You will receive your file. Closing...';
+                        setTimeout(() => tg.close(), 1500);
+                    } else {
+                        adStatusDiv.innerHTML = '⚠️ Could not contact bot. Please try again.';
+                    }
+                })
+                .catch((err) => {
+                    console.error("Monetag Ad Error:", err);
+                    adStatusDiv.innerHTML = '❌ Ad failed. Please try again.';
+                    adStatusDiv.classList.add('error');
+                    loadingView.classList.add('hidden');
+                    adView.classList.remove('hidden');
+                });
+        });
+
+        // Initial UI setup
+        setTimeout(() => {
+            loadingView.classList.add('hidden');
+            adView.classList.remove('hidden');
+            console.log("UI Ready. Waiting for user to click watch ad.");
+        }, 1000);
+    </script>
+</body>
+</html>
