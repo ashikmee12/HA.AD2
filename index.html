@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <title>File Store Bot</title>
+    <style>
+        body {
+            font-family: system-ui;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: var(--tg-theme-bg-color);
+            color: var(--tg-theme-text-color);
+        }
+        .container { text-align: center; padding: 20px; }
+        button {
+            background: var(--tg-theme-button-color);
+            color: var(--tg-theme-button-text-color);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .hidden { display: none; }
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .status { margin-top: 20px; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="loadingView">
+            <div class="loader"></div>
+            <div class="status">Loading...</div>
+        </div>
+        <div id="adView" class="hidden">
+            <button id="watchAdBtn">🎁 Watch Ad & Get File</button>
+            <div id="adStatus" class="status"></div>
+        </div>
+    </div>
+
+    <script src='//libtl.com/sdk.js' data-zone='10823122' data-sdk='show_10823122'></script>
+    <script>
+        let tg = window.Telegram.WebApp;
+        tg.expand();
+        
+        // Get parameters from URL
+        let urlParams = new URLSearchParams(window.location.search);
+        let fileCode = urlParams.get('file_code') || tg.initDataUnsafe.start_param || 'unknown';
+        let userId = urlParams.get('user_id') || tg.initDataUnsafe.user?.id || 'unknown';
+        
+        console.log("File Code:", fileCode);
+        console.log("User ID:", userId);
+        
+        // Callback URL to your bot
+        const CALLBACK_URL = 'https://hanime-2-f4rp.onrender.com/ad-callback';
+        
+        async function sendToBot(status) {
+            try {
+                let response = await fetch(CALLBACK_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        status: status,
+                        file_code: fileCode,
+                        user_id: userId
+                    })
+                });
+                console.log("Callback response:", response.status);
+                return response.ok;
+            } catch(e) {
+                console.error("Callback error:", e);
+                return false;
+            }
+        }
+        
+        const watchAdBtn = document.getElementById('watchAdBtn');
+        const loadingView = document.getElementById('loadingView');
+        const adView = document.getElementById('adView');
+        const adStatusDiv = document.getElementById('adStatus');
+        
+        watchAdBtn.addEventListener('click', async () => {
+            adView.classList.add('hidden');
+            loadingView.classList.remove('hidden');
+            adStatusDiv.innerHTML = '';
+            
+            if (typeof show_10823122 === 'undefined') {
+                adStatusDiv.innerHTML = 'Ad service error. Please try again.';
+                adStatusDiv.classList.add('error');
+                loadingView.classList.add('hidden');
+                adView.classList.remove('hidden');
+                return;
+            }
+            
+            try {
+                await show_10823122();
+                console.log("Ad completed");
+                
+                adStatusDiv.innerHTML = 'Ad completed! Sending file...';
+                adStatusDiv.classList.add('success');
+                
+                let sent = await sendToBot('ad_completed');
+                if (sent) {
+                    adStatusDiv.innerHTML = '✅ Success! File will arrive shortly. Closing...';
+                    setTimeout(() => tg.close(), 2000);
+                } else {
+                    adStatusDiv.innerHTML = '⚠️ Could not reach server. Please try again.';
+                    adStatusDiv.classList.add('error');
+                    loadingView.classList.add('hidden');
+                    adView.classList.remove('hidden');
+                }
+            } catch(err) {
+                console.error("Ad error:", err);
+                adStatusDiv.innerHTML = '❌ Ad failed. Please try again.';
+                adStatusDiv.classList.add('error');
+                loadingView.classList.add('hidden');
+                adView.classList.remove('hidden');
+            }
+        });
+        
+        setTimeout(() => {
+            loadingView.classList.add('hidden');
+            adView.classList.remove('hidden');
+        }, 1000);
+    </script>
+</body>
+</html>
